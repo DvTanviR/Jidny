@@ -120,7 +120,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'e1',
-    name: 'Aurelia 14K Gold Ribbed Hoop Earrings',
+    name: 'Jidny 14K Gold Ribbed Hoop Earrings',
     category: 'earrings',
     price: 128,
     originalPrice: 165,
@@ -171,7 +171,7 @@ export const CATEGORIES = [
 
 export const CAMPAIGN_DETAILS = {
   aurelia: {
-    title: 'A U R E L I A',
+    title: 'J I D N Y',
     subtitle: 'CONFIDENT. MODERN. UNAPOLOGETIC.',
     tagline: 'AUTUMN / WINTER COLLECTION 2026',
     description: 'A structural exploration of raw form and polished refinement. Featuring bold sculptural silhouettes, luxury fringe tailoring, and modern golden vermeil geometry.',

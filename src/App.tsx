@@ -40,6 +40,14 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [showCategoryOverlay, setShowCategoryOverlay] = useState(false);
 
+  // Dedicated Shop Page State
+  const [currentView, setCurrentView] = useState<'home' | 'shop'>('home');
+  const [shopColorFilter, setShopColorFilter] = useState<string>('all');
+  const [shopPriceFilter, setShopPriceFilter] = useState<string>('all');
+  const [shopRatingFilter, setShopRatingFilter] = useState<string>('all');
+  const [shopSortOption, setShopSortOption] = useState<string>('alpha-asc');
+  const [activeDropdown, setActiveDropdown] = useState<'color' | 'price' | 'type' | 'rating' | 'sort' | null>(null);
+
   // State for search query and suggestions
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([
@@ -187,7 +195,7 @@ export default function App() {
       }
 
       // Update document meta & title for SEO optimization
-      document.title = `${selectedProduct.name} | ${viewMode === 'aurelia' ? 'Aurelia' : 'Pavoi'} Jewelry`;
+      document.title = `${selectedProduct.name} | ${viewMode === 'aurelia' ? 'Jidny' : 'Jidny Couture'} Jewelry`;
       
       let metaDesc = document.querySelector('meta[name="description"]');
       if (!metaDesc) {
@@ -201,7 +209,7 @@ export default function App() {
       if (window.location.pathname !== '/' && !window.location.pathname.endsWith('/index.html')) {
         window.history.pushState({}, '', '/');
       }
-      document.title = `${viewMode === 'aurelia' ? 'AURELIA' : 'PAVOI'} | Fine Jewelry & Accessories`;
+      document.title = `${viewMode === 'aurelia' ? 'JIDNY' : 'JIDNY COUTURE'} | Fine Jewelry & Accessories`;
     }
   }, [selectedProduct, viewMode]);
 
@@ -262,11 +270,64 @@ export default function App() {
     }
   };
 
-  // Dynamic products filtered by collection
+  // Dynamic products filtered by collection, color, price, rating, and sorted
   const filteredProducts = useMemo(() => {
-    if (activeCategory === 'all') return PRODUCTS;
-    return PRODUCTS.filter((p) => p.category === activeCategory);
-  }, [activeCategory]);
+    let result = [...PRODUCTS];
+
+    // Category filter
+    if (activeCategory !== 'all') {
+      result = result.filter((p) => p.category === activeCategory);
+    }
+
+    // Color/Material filter
+    if (shopColorFilter !== 'all') {
+      result = result.filter((p) => {
+        const mats = p.materials.map((m) => m.toLowerCase());
+        if (shopColorFilter === 'gold') {
+          return mats.some((m) => m.includes('yellow gold') || m.includes('gold'));
+        }
+        if (shopColorFilter === 'silver') {
+          return mats.some((m) => m.includes('silver') || m.includes('sterling') || m.includes('white gold'));
+        }
+        if (shopColorFilter === 'rose') {
+          return mats.some((m) => m.includes('rose gold'));
+        }
+        return true;
+      });
+    }
+
+    // Price filter
+    if (shopPriceFilter !== 'all') {
+      if (shopPriceFilter === 'under-15') {
+        result = result.filter((p) => p.price < 15);
+      } else if (shopPriceFilter === '15-25') {
+        result = result.filter((p) => p.price >= 15 && p.price <= 25);
+      } else if (shopPriceFilter === 'over-25') {
+        result = result.filter((p) => p.price > 25);
+      }
+    }
+
+    // Rating filter
+    if (shopRatingFilter !== 'all') {
+      const minRating = parseFloat(shopRatingFilter);
+      result = result.filter((p) => p.rating >= minRating);
+    }
+
+    // Sorting
+    if (shopSortOption === 'alpha-asc') {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (shopSortOption === 'alpha-desc') {
+      result.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (shopSortOption === 'price-asc') {
+      result.sort((a, b) => a.price - b.price);
+    } else if (shopSortOption === 'price-desc') {
+      result.sort((a, b) => b.price - a.price);
+    } else if (shopSortOption === 'rating-desc') {
+      result.sort((a, b) => b.rating - a.rating);
+    }
+
+    return result;
+  }, [activeCategory, shopColorFilter, shopPriceFilter, shopRatingFilter, shopSortOption]);
 
   // Search filter
   const searchedProducts = useMemo(() => {
@@ -335,16 +396,23 @@ export default function App() {
     }
   };
 
+  const openShopCategory = (category: string) => {
+    setActiveCategory(category);
+    setCurrentView('shop');
+    setSelectedProduct(null);
+    setShowCategoryOverlay(false);
+  };
+
   return (
     <div className={`relative min-h-screen overflow-x-hidden font-sans selection:bg-[#d4a373]/30 transition-colors duration-500 ${
-      selectedProduct ? 'bg-white text-neutral-900' : 'bg-[#0d0d0d] text-[#f5f5f5]'
+      selectedProduct || currentView === 'shop' ? 'bg-white text-neutral-900' : 'bg-[#0d0d0d] text-[#f5f5f5]'
     }`}>
       
       {/* 1. Header/Navbar (Transparent, Absolute on Top of Image) */}
       <header
         id="navbar-header"
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ${
-          hasScrolled || selectedProduct ? 'bg-white shadow-[0_1px_8px_rgba(0,0,0,0.05)] text-neutral-900' : 'bg-transparent text-[#f5f5f5]'
+          hasScrolled || selectedProduct || currentView === 'shop' ? 'bg-white shadow-[0_1px_8px_rgba(0,0,0,0.05)] text-neutral-900 border-b border-neutral-100' : 'bg-transparent text-[#f5f5f5]'
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 grid grid-cols-3 items-center">
@@ -355,10 +423,12 @@ export default function App() {
               id="nav-best-sellers"
               onClick={() => {
                 setActiveCategory('all');
-                setShowCategoryOverlay(true);
+                setShopSortOption('rating-desc');
+                setCurrentView('shop');
+                setSelectedProduct(null);
               }}
               className={`transition-colors py-2 relative ${
-                hasScrolled || selectedProduct ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
+                hasScrolled || selectedProduct || currentView === 'shop' ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
               }`}
             >
               BEST SELLERS
@@ -367,37 +437,28 @@ export default function App() {
               id="nav-new-arrivals"
               onClick={() => {
                 setActiveCategory('all');
-                setShowCategoryOverlay(true);
+                setShopSortOption('alpha-asc');
+                setCurrentView('shop');
+                setSelectedProduct(null);
               }}
-              className={`transition-colors py-2 relative flex items-center gap-1 ${
-                hasScrolled || selectedProduct ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
+              className={`transition-colors py-2 relative ${
+                hasScrolled || selectedProduct || currentView === 'shop' ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
               }`}
             >
-              NEW ARRIVALS
+              NEW
             </button>
             <button
               id="nav-earrings"
               onClick={() => {
                 setActiveCategory('earrings');
-                setShowCategoryOverlay(true);
+                setCurrentView('shop');
+                setSelectedProduct(null);
               }}
               className={`transition-colors py-2 relative ${
-                hasScrolled || selectedProduct ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
+                hasScrolled || selectedProduct || currentView === 'shop' ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
               }`}
             >
               EARRINGS
-            </button>
-            <button
-              id="nav-rings"
-              onClick={() => {
-                setActiveCategory('rings');
-                setShowCategoryOverlay(true);
-              }}
-              className={`transition-colors py-2 relative ${
-                hasScrolled || selectedProduct ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
-              }`}
-            >
-              RINGS
             </button>
           </nav>
           
@@ -408,7 +469,7 @@ export default function App() {
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Open menu"
               className={`p-1 transition-colors ${
-                hasScrolled || selectedProduct ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
+                hasScrolled || selectedProduct || currentView === 'shop' ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
               }`}
             >
               <Menu size={16} />
@@ -421,13 +482,13 @@ export default function App() {
               id="brand-logo-btn"
               onClick={() => {
                 setSelectedProduct(null);
-                setViewMode(viewMode === 'aurelia' ? 'pavoi' : 'aurelia');
+                setCurrentView('home');
               }}
               className={`font-display text-lg md:text-xl font-light tracking-[0.25em] transition-colors duration-300 ${
-                hasScrolled || selectedProduct ? 'text-neutral-900 hover:text-[#d4a373]' : 'text-[#f5f5f5] hover:text-[#d4a373]'
+                hasScrolled || selectedProduct || currentView === 'shop' ? 'text-neutral-900 hover:text-[#d4a373]' : 'text-[#f5f5f5] hover:text-[#d4a373]'
               }`}
             >
-              {viewMode === 'aurelia' ? 'AURELIA' : 'PAVOI'}
+              {viewMode === 'aurelia' ? 'JIDNY' : 'JIDNY COUTURE'}
             </button>
           </div>
 
@@ -439,7 +500,7 @@ export default function App() {
               onClick={() => setIsSearchOpen(true)}
               aria-label="Search Collection"
               className={`p-1 transition-all duration-200 ${
-                hasScrolled || selectedProduct ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
+                hasScrolled || selectedProduct || currentView === 'shop' ? 'text-neutral-700 hover:text-black' : 'text-[#f5f5f5]/80 hover:text-white'
               }`}
             >
               <Search size={15} strokeWidth={1.5} />
@@ -451,7 +512,7 @@ export default function App() {
               onClick={() => setIsCartOpen(true)}
               aria-label="Shopping Cart"
               className={`p-1 transition-all duration-200 relative ${
-                hasScrolled || selectedProduct ? 'text-neutral-700 hover:text-[#d4a373]' : 'text-[#f5f5f5]/80 hover:text-[#d4a373]'
+                hasScrolled || selectedProduct || currentView === 'shop' ? 'text-neutral-700 hover:text-[#d4a373]' : 'text-[#f5f5f5]/80 hover:text-[#d4a373]'
               }`}
             >
               <ShoppingBag size={15} strokeWidth={1.5} />
@@ -466,7 +527,8 @@ export default function App() {
       </header>
 
       {!selectedProduct ? (
-        <>
+        currentView === 'home' ? (
+          <>
           {/* 2. Full-Screen Hero Background Image Container */}
       <section
         id="hero-section"
@@ -512,10 +574,7 @@ export default function App() {
             {/* Underlined button: BEST SELLERS */}
             <button
               id="hero-best-sellers-btn"
-              onClick={() => {
-                setActiveCategory('all');
-                setShowCategoryOverlay(true);
-              }}
+              onClick={() => openShopCategory('all')}
               className="text-[10px] sm:text-xs font-semibold tracking-[0.25em] text-[#f5f5f5] border-b border-white hover:text-[#d4a373] hover:border-[#d4a373] pb-1 uppercase transition-colors duration-300 cursor-pointer"
             >
               BEST SELLERS
@@ -537,10 +596,7 @@ export default function App() {
             {/* Column 1: Dior Initials */}
             <div
               id="triptych-col-1"
-              onClick={() => {
-                setActiveCategory('all');
-                setShowCategoryOverlay(true);
-              }}
+              onClick={() => openShopCategory('all')}
               className="relative aspect-[3/4] overflow-hidden cursor-pointer group"
             >
               <img
@@ -564,10 +620,7 @@ export default function App() {
             {/* Column 2: Sunglasses */}
             <div
               id="triptych-col-2"
-              onClick={() => {
-                setActiveCategory('all');
-                setShowCategoryOverlay(true);
-              }}
+              onClick={() => openShopCategory('all')}
               className="relative aspect-[3/4] overflow-hidden cursor-pointer group"
             >
               <img
@@ -589,10 +642,7 @@ export default function App() {
             {/* Column 3: Bags */}
             <div
               id="triptych-col-3"
-              onClick={() => {
-                setActiveCategory('all');
-                setShowCategoryOverlay(true);
-              }}
+              onClick={() => openShopCategory('all')}
               className="relative aspect-[3/4] overflow-hidden cursor-pointer group"
             >
               <img
@@ -628,10 +678,7 @@ export default function App() {
             <div className="flex items-center">
               <button
                 id="shop-all-link-btn"
-                onClick={() => {
-                  setActiveCategory('all');
-                  setShowCategoryOverlay(true);
-                }}
+                onClick={() => openShopCategory('all')}
                 className="group relative text-[10px] sm:text-xs font-semibold tracking-[0.2em] text-[#111111] uppercase pb-1 cursor-pointer mr-6"
               >
                 Shop All
@@ -642,10 +689,7 @@ export default function App() {
               <div className="flex gap-2">
                 <button
                   id="bestsellers-prev-btn"
-                  onClick={() => {
-                    setActiveCategory('all');
-                    setShowCategoryOverlay(true);
-                  }}
+                  onClick={() => openShopCategory('all')}
                   aria-label="Previous Best Sellers"
                   className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:border-black/30 text-black/70 hover:text-black transition-all"
                 >
@@ -653,10 +697,7 @@ export default function App() {
                 </button>
                 <button
                   id="bestsellers-next-btn"
-                  onClick={() => {
-                    setActiveCategory('all');
-                    setShowCategoryOverlay(true);
-                  }}
+                  onClick={() => openShopCategory('all')}
                   aria-label="Next Best Sellers"
                   className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:border-black/30 text-black/70 hover:text-black transition-all"
                 >
@@ -724,7 +765,7 @@ export default function App() {
                     {/* Product Name */}
                     <button
                       onClick={() => setSelectedProduct(product)}
-                      className="text-left font-sans text-xs sm:text-sm font-semibold text-neutral-900 mt-1 hover:text-[#d4a373] transition-colors leading-tight"
+                      className="text-left font-sans text-xs sm:text-sm font-semibold text-neutral-900 mt-1 hover:text-black hover:underline transition-colors leading-tight cursor-pointer"
                     >
                       {product.name}
                     </button>
@@ -865,8 +906,436 @@ export default function App() {
         </button>
       </section>
     </>
+    ) : (
+      /* --- DEDICATED PRODUCTS/SHOP VIEW --- */
+      <div className="bg-white min-h-screen text-neutral-900 font-sans pt-32 pb-24 animate-fadeIn">
+        
+        {/* A. Sticky Filter and Sort Navigation Row */}
+        <div className="sticky top-[116px] bg-white border-b border-neutral-100 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.02)] py-4 px-6 md:px-12">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            
+            {/* Left Side: Filter Pill Buttons */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              
+              {/* 1. Color Filter Pill */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveDropdown(activeDropdown === 'color' ? null : 'color')}
+                  className={`px-4 py-2 text-[11px] font-semibold tracking-wider uppercase rounded-full border transition-all flex items-center gap-1.5 ${
+                    shopColorFilter !== 'all'
+                      ? 'bg-[#1e2d30] text-white border-[#1e2d30]'
+                      : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400'
+                  }`}
+                >
+                  <span>Color{shopColorFilter !== 'all' ? `: ${shopColorFilter}` : ''}</span>
+                  <span className="text-[9px] opacity-60">▼</span>
+                </button>
+                {activeDropdown === 'color' && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
+                    <div className="absolute left-0 mt-2 w-48 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 py-1.5 text-xs text-neutral-800">
+                      <button
+                        onClick={() => { setShopColorFilter('all'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>All Colors</span>
+                        {shopColorFilter === 'all' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopColorFilter('gold'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Yellow Gold</span>
+                        {shopColorFilter === 'gold' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopColorFilter('silver'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Silver / White Gold</span>
+                        {shopColorFilter === 'silver' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopColorFilter('rose'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Rose Gold</span>
+                        {shopColorFilter === 'rose' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* 2. Price Filter Pill */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveDropdown(activeDropdown === 'price' ? null : 'price')}
+                  className={`px-4 py-2 text-[11px] font-semibold tracking-wider uppercase rounded-full border transition-all flex items-center gap-1.5 ${
+                    shopPriceFilter !== 'all'
+                      ? 'bg-[#1e2d30] text-white border-[#1e2d30]'
+                      : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400'
+                  }`}
+                >
+                  <span>Price{shopPriceFilter !== 'all' ? `: ${shopPriceFilter.replace('-', ' to ')}` : ''}</span>
+                  <span className="text-[9px] opacity-60">▼</span>
+                </button>
+                {activeDropdown === 'price' && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
+                    <div className="absolute left-0 mt-2 w-48 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 py-1.5 text-xs text-neutral-800">
+                      <button
+                        onClick={() => { setShopPriceFilter('all'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>All Prices</span>
+                        {shopPriceFilter === 'all' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopPriceFilter('under-15'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Under $15</span>
+                        {shopPriceFilter === 'under-15' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopPriceFilter('15-25'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>$15 - $25</span>
+                        {shopPriceFilter === '15-25' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopPriceFilter('over-25'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Over $25</span>
+                        {shopPriceFilter === 'over-25' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* 3. Product Type / Category Filter Pill */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveDropdown(activeDropdown === 'type' ? null : 'type')}
+                  className={`px-4 py-2 text-[11px] font-semibold tracking-wider uppercase rounded-full border transition-all flex items-center gap-1.5 ${
+                    activeCategory !== 'all'
+                      ? 'bg-[#1e2d30] text-white border-[#1e2d30]'
+                      : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400'
+                  }`}
+                >
+                  <span>Product Type{activeCategory !== 'all' ? `: ${activeCategory}` : ''}</span>
+                  <span className="text-[9px] opacity-60">▼</span>
+                </button>
+                {activeDropdown === 'type' && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
+                    <div className="absolute left-0 mt-2 w-48 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 py-1.5 text-xs text-neutral-800">
+                      <button
+                        onClick={() => { setActiveCategory('all'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>All Products</span>
+                        {activeCategory === 'all' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setActiveCategory('earrings'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Earrings</span>
+                        {activeCategory === 'earrings' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setActiveCategory('rings'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Rings</span>
+                        {activeCategory === 'rings' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setActiveCategory('necklaces'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Necklaces</span>
+                        {activeCategory === 'necklaces' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setActiveCategory('bracelets'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Bracelets</span>
+                        {activeCategory === 'bracelets' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* 4. Rating Filter Pill */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveDropdown(activeDropdown === 'rating' ? null : 'rating')}
+                  className={`px-4 py-2 text-[11px] font-semibold tracking-wider uppercase rounded-full border transition-all flex items-center gap-1.5 ${
+                    shopRatingFilter !== 'all'
+                      ? 'bg-[#1e2d30] text-white border-[#1e2d30]'
+                      : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400'
+                  }`}
+                >
+                  <span>Rating{shopRatingFilter !== 'all' ? `: ${shopRatingFilter}★+` : ''}</span>
+                  <span className="text-[9px] opacity-60">▼</span>
+                </button>
+                {activeDropdown === 'rating' && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
+                    <div className="absolute left-0 mt-2 w-48 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 py-1.5 text-xs text-neutral-800">
+                      <button
+                        onClick={() => { setShopRatingFilter('all'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>All Ratings</span>
+                        {shopRatingFilter === 'all' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopRatingFilter('4.8'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>4.8★ & up</span>
+                        {shopRatingFilter === '4.8' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopRatingFilter('4.6'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>4.6★ & up</span>
+                        {shopRatingFilter === '4.6' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* 5. Clear / All Filters Pill */}
+              <button
+                onClick={() => {
+                  setShopColorFilter('all');
+                  setShopPriceFilter('all');
+                  setShopRatingFilter('all');
+                  setActiveCategory('all');
+                  setShopSortOption('alpha-asc');
+                }}
+                className="px-4 py-2 text-[11px] font-semibold tracking-wider uppercase rounded-full border border-neutral-200 text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-all"
+              >
+                All Filters ⟲
+              </button>
+
+            </div>
+
+            {/* Right Side: Product Count & Sort */}
+            <div className="flex items-center gap-6 text-[11px] font-semibold tracking-wider text-neutral-500">
+              <span className="uppercase">{filteredProducts.length} Products</span>
+              
+              {/* Sort Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveDropdown(activeDropdown === 'sort' ? null : 'sort')}
+                  className="flex items-center gap-1.5 text-neutral-800 hover:text-black uppercase text-[11px] font-semibold tracking-wider"
+                >
+                  <span>
+                    Sort: {
+                      shopSortOption === 'alpha-asc' ? 'Alphabetically, A-Z' :
+                      shopSortOption === 'alpha-desc' ? 'Alphabetically, Z-A' :
+                      shopSortOption === 'price-asc' ? 'Price, Low to High' :
+                      shopSortOption === 'price-desc' ? 'Price, High to Low' : 'Best Sellers'
+                    }
+                  </span>
+                  <span className="text-[9px]">▼</span>
+                </button>
+                {activeDropdown === 'sort' && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 py-1.5 text-xs text-neutral-800">
+                      <button
+                        onClick={() => { setShopSortOption('alpha-asc'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Alphabetically, A-Z</span>
+                        {shopSortOption === 'alpha-asc' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopSortOption('alpha-desc'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Alphabetically, Z-A</span>
+                        {shopSortOption === 'alpha-desc' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopSortOption('price-asc'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Price, Low to High</span>
+                        {shopSortOption === 'price-asc' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopSortOption('price-desc'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Price, High to Low</span>
+                        {shopSortOption === 'price-desc' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShopSortOption('rating-desc'); setActiveDropdown(null); }}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-50 flex justify-between items-center"
+                      >
+                        <span>Best Sellers (Rating)</span>
+                        {shopSortOption === 'rating-desc' && <span className="text-green-600 font-bold">✓</span>}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        {/* B. Products Grid */}
+        <div className="max-w-7xl mx-auto px-6 md:px-12 mt-10">
+          {filteredProducts.length === 0 ? (
+            <div className="text-center py-24">
+              <p className="text-sm text-neutral-400 tracking-widest uppercase">No products match your filters.</p>
+              <button
+                onClick={() => {
+                  setShopColorFilter('all');
+                  setShopPriceFilter('all');
+                  setShopRatingFilter('all');
+                  setActiveCategory('all');
+                }}
+                className="mt-6 text-xs font-bold tracking-[0.2em] text-[#d4a373] hover:text-black transition-all border-b border-[#d4a373] pb-1 uppercase"
+              >
+                Reset all filters
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
+              {filteredProducts.map((product) => {
+                const isWishlisted = wishlist.some((p) => p.id === product.id);
+                const isSoldOut = product.id === 'pair-1' || product.id === 'pair-3';
+                const metalTag = (product.spec || 'YELLOW GOLD').split('/')[0].trim().toUpperCase() + (product.materials.length > 1 ? ` / ${product.materials.length}` : '');
+
+                return (
+                  <div key={product.id} className="group flex flex-col">
+                    
+                    {/* Image Frame with strictly sharp corners & luxurious off-white background */}
+                    <div 
+                      onClick={() => setSelectedProduct(product)}
+                      className="relative aspect-[3/4] w-full bg-[#f9f9f9] border border-neutral-100 overflow-hidden cursor-pointer"
+                    >
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                      />
+
+                      {/* Sold Out Overlay Badge */}
+                      {isSoldOut && (
+                        <span className="absolute top-4 left-4 bg-white text-black text-[9px] font-bold tracking-[0.2em] px-2.5 py-1.5 uppercase shadow-sm border border-neutral-100">
+                          SOLD OUT
+                        </span>
+                      )}
+
+                      {/* New Arrival Badge */}
+                      {!isSoldOut && product.isNew && (
+                        <span className="absolute top-4 left-4 bg-[#1e2d30] text-[#f5f5f5] text-[8px] font-bold tracking-[0.2em] px-2.5 py-1 uppercase">
+                          NEW
+                        </span>
+                      )}
+
+                      {/* Wishlist Heart Icon Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleWishlist(product);
+                        }}
+                        className="absolute top-4 right-4 text-black hover:scale-110 transition-all duration-200"
+                        aria-label="Toggle Wishlist"
+                      >
+                        <Heart
+                          size={16}
+                          strokeWidth={1.5}
+                          className={isWishlisted ? 'fill-black text-black' : 'text-black/70 hover:text-black'}
+                        />
+                      </button>
+
+                      {/* Quick Add Overlay Button on Hover */}
+                      {!isSoldOut && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(product, product.materials[0]);
+                          }}
+                          className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] bg-white hover:bg-neutral-950 hover:text-white text-neutral-900 font-sans text-[10px] font-bold py-3 px-4 rounded-full tracking-[0.15em] text-center uppercase transition-all duration-300 opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0 shadow-lg"
+                        >
+                          Add to Bag
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Content block left-aligned underneath image */}
+                    <div className="mt-4 flex flex-col text-left">
+                      {/* Upper grey category specs */}
+                      <span className="text-[10px] tracking-wider text-neutral-400 font-semibold uppercase">
+                        {metalTag}
+                      </span>
+
+                      {/* Product Title */}
+                      <button
+                        onClick={() => setSelectedProduct(product)}
+                        className="text-left font-sans text-xs sm:text-sm font-bold text-neutral-900 mt-1.5 hover:text-black hover:underline transition-colors leading-tight line-clamp-1 cursor-pointer"
+                      >
+                        {product.name}
+                      </button>
+
+                      {/* Price */}
+                      <span className="font-sans text-xs sm:text-sm text-neutral-700 mt-1 font-medium">
+                        ${product.price.toFixed(2)}
+                      </span>
+
+                      {/* Color Swatches */}
+                      <div className="flex items-center gap-1.5 mt-2.5">
+                        {product.materials.map((material, mIdx) => {
+                          let colorClass = 'bg-[#e5c158]'; // Gold default
+                          if (material.toLowerCase().includes('white') || material.toLowerCase().includes('silver') || material.toLowerCase().includes('sterling')) {
+                            colorClass = 'bg-[#d1d5db]';
+                          } else if (material.toLowerCase().includes('rose')) {
+                            colorClass = 'bg-[#e2a899]';
+                          }
+                          
+                          return (
+                            <div
+                              key={mIdx}
+                              title={material}
+                              className={`w-3 h-3 rounded-full ${colorClass} border border-white ring-1 ring-black/15 cursor-pointer hover:scale-110 transition-transform`}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+      </div>
+    )
   ) : (
-    /* F. Product Details Page (Inline, Elegant Light-Themed Section) */
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -1174,7 +1643,7 @@ export default function App() {
           {/* Huge Brand Typography */}
           <div className="w-full overflow-hidden mb-16 select-none">
             <h2 className="text-[14vw] md:text-[11vw] font-black tracking-[-0.03em] text-[#111111] leading-none text-center font-sans">
-              {viewMode === 'aurelia' ? 'AURELIA' : 'PAVOI'}
+              {viewMode === 'aurelia' ? 'JIDNY' : 'JIDNY COUTURE'}
             </h2>
           </div>
 
@@ -1297,14 +1766,7 @@ export default function App() {
 
           </div>
 
-          <div className="mt-16 pt-8 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-[9px] font-semibold tracking-widest text-neutral-400 uppercase">
-              © {new Date().getFullYear()} {viewMode === 'aurelia' ? 'AURELIA' : 'PAVOI'} fine jewelry. All rights reserved.
-            </p>
-            <p className="text-[9px] font-semibold tracking-widest text-neutral-400 uppercase">
-              Crafted with Swiss elegance & precision
-            </p>
-          </div>
+
         </div>
       </footer>
 
@@ -1344,7 +1806,7 @@ export default function App() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="SEARCH THE AURELIA COLLECTION..."
+                  placeholder="SEARCH THE JIDNY COLLECTION..."
                   className="w-full bg-transparent text-2xl sm:text-4xl font-light tracking-[0.1em] text-white placeholder-white/20 border-none outline-none focus:ring-0"
                   autoFocus
                 />
@@ -1447,16 +1909,16 @@ export default function App() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween', duration: 0.35 }}
-              className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-[#121212] border-l border-white/5 p-6 sm:p-8 flex flex-col"
+              className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-[#f9f9f9] border-l border-neutral-200 p-6 sm:p-8 flex flex-col shadow-2xl"
             >
-              <div className="flex items-center justify-between border-b border-white/10 pb-6 mb-6">
-                <h2 className="text-sm font-semibold tracking-[0.25em] text-white uppercase">
+              <div className="flex items-center justify-between border-b border-neutral-200 pb-6 mb-6">
+                <h2 className="text-sm font-semibold tracking-[0.25em] text-neutral-900 uppercase">
                   SHOPPING BAG ({cartCount})
                 </h2>
                 <button
                   id="close-cart-btn"
                   onClick={() => setIsCartOpen(false)}
-                  className="p-1 text-white/50 hover:text-white transition-colors"
+                  className="p-1 text-neutral-400 hover:text-black transition-colors"
                 >
                   <X size={18} />
                 </button>
@@ -1466,8 +1928,8 @@ export default function App() {
               <div className="flex-1 overflow-y-auto space-y-6 pr-2">
                 {cart.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center">
-                    <ShoppingBag size={48} strokeWidth={1} className="text-white/20 mb-4" />
-                    <p className="text-sm text-white/50 tracking-wider">
+                    <ShoppingBag size={48} strokeWidth={1} className="text-neutral-300 mb-4" />
+                    <p className="text-sm text-neutral-500 tracking-wider">
                       Your luxurious shopping bag is empty.
                     </p>
                     <button
@@ -1475,7 +1937,7 @@ export default function App() {
                         setIsCartOpen(false);
                         setShowCategoryOverlay(true);
                       }}
-                      className="mt-6 text-xs font-semibold tracking-[0.2em] text-[#d4a373] hover:text-white transition-colors border-b border-[#d4a373] pb-1 uppercase"
+                      className="mt-6 text-xs font-semibold tracking-[0.2em] text-[#d4a373] hover:text-black transition-colors border-b border-[#d4a373] pb-1 uppercase"
                     >
                       Browse Boutique
                     </button>
@@ -1484,23 +1946,23 @@ export default function App() {
                   cart.map((item, idx) => (
                     <div
                       key={`${item.product.id}-${item.selectedMaterial}-${idx}`}
-                      className="flex gap-4 border-b border-white/5 pb-6"
+                      className="flex gap-4 border-b border-neutral-200/60 pb-6"
                     >
                       <img
                         src={item.product.image}
                         alt={item.product.name}
                         referrerPolicy="no-referrer"
-                        className="w-20 h-24 object-cover rounded bg-white/5"
+                        className="w-20 h-24 object-cover rounded bg-neutral-100 border border-neutral-200/50"
                       />
                       <div className="flex-1 flex flex-col justify-between">
                         <div>
                           <div className="flex justify-between items-start">
-                            <h3 className="text-xs font-medium text-white tracking-wide leading-tight max-w-[80%]">
+                            <h3 className="text-xs font-medium text-neutral-900 tracking-wide leading-tight max-w-[80%]">
                               {item.product.name}
                             </h3>
                             <button
                               onClick={() => removeFromCart(item.product.id, item.selectedMaterial || '')}
-                              className="text-white/40 hover:text-red-400 transition-colors"
+                              className="text-neutral-400 hover:text-red-600 transition-colors"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -1510,28 +1972,28 @@ export default function App() {
                           </p>
                         </div>
                         <div className="flex items-end justify-between mt-4">
-                          <div className="flex items-center border border-white/10 rounded overflow-hidden">
+                          <div className="flex items-center border border-neutral-200 rounded overflow-hidden bg-white">
                             <button
                               onClick={() =>
                                 updateCartQuantity(item.product.id, item.selectedMaterial || '', -1)
                               }
-                              className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+                              className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-50 transition-colors"
                             >
                               <Minus size={11} />
                             </button>
-                            <span className="px-3 text-xs font-medium text-white">
+                            <span className="px-3 text-xs font-medium text-neutral-800">
                               {item.quantity}
                             </span>
                             <button
                               onClick={() =>
                                 updateCartQuantity(item.product.id, item.selectedMaterial || '', 1)
                               }
-                              className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+                              className="p-1.5 text-neutral-400 hover:text-neutral-950 hover:bg-neutral-50 transition-colors"
                             >
                               <Plus size={11} />
                             </button>
                           </div>
-                          <span className="text-xs font-semibold text-white">
+                          <span className="text-xs font-semibold text-neutral-900">
                             ${item.product.price * item.quantity}.00
                           </span>
                         </div>
@@ -1543,29 +2005,29 @@ export default function App() {
 
               {/* Checkout Block */}
               {cart.length > 0 && (
-                <div className="border-t border-white/10 pt-6 mt-6">
+                <div className="border-t border-neutral-200 pt-6 mt-6">
                   <div className="space-y-3 mb-6">
-                    <div className="flex justify-between text-xs text-white/60 tracking-wider">
+                    <div className="flex justify-between text-xs text-neutral-500 tracking-wider">
                       <span>BOUTIQUE SHIPPING</span>
                       <span className="text-[#d4a373] uppercase font-semibold">COMPLIMENTARY</span>
                     </div>
                     <div className="flex justify-between items-end pt-2">
-                      <span className="text-xs font-semibold tracking-wider text-white">SUBTOTAL</span>
-                      <span className="text-lg font-bold text-white">${cartSubtotal}.00</span>
+                      <span className="text-xs font-semibold tracking-wider text-neutral-500">SUBTOTAL</span>
+                      <span className="text-lg font-bold text-neutral-900">${cartSubtotal}.00</span>
                     </div>
                   </div>
 
                   <button
                     onClick={() => {
-                      alert('Thank you for experiencing Aurelia Modern Luxury! This is a designer concept storefront.');
+                      alert('Thank you for experiencing Jidny Modern Luxury! This is a designer concept storefront.');
                     }}
-                    className="w-full py-4 bg-[#f5f5f5] hover:bg-white text-black text-xs font-bold tracking-[0.25em] uppercase transition-all duration-300 flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-[#1e2d30] hover:bg-black text-white text-xs font-bold tracking-[0.25em] uppercase transition-all duration-300 flex items-center justify-center gap-2 rounded-full"
                   >
-                    <span>SECURE CHECKOUT</span>
+                    <span>PROCESS CHECKOUT</span>
                     <ArrowUpRight size={14} />
                   </button>
 
-                  <p className="text-center text-[10px] text-white/40 tracking-wide mt-4">
+                  <p className="text-center text-[10px] text-neutral-400 tracking-wide mt-4">
                     Insured signature delivery & elegant gift wrapping included.
                   </p>
                 </div>
@@ -1693,7 +2155,7 @@ export default function App() {
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-6 mb-6">
                 <h2 className="text-sm font-semibold tracking-[0.25em] text-white uppercase">
-                  AURELIA PRIVÉ MEMBER
+                  JIDNY PRIVÉ MEMBER
                 </h2>
                 <button
                   id="close-profile-btn"
@@ -1711,7 +2173,7 @@ export default function App() {
                   <div className="flex justify-between items-start mb-12">
                     <div>
                       <span className="text-[10px] tracking-[0.3em] text-[#d4a373] uppercase font-semibold">
-                        AURELIA PRIVÉ
+                        JIDNY PRIVÉ
                       </span>
                       <h3 className="text-base font-light tracking-wider text-white mt-1">
                         Evelyn Sterling
@@ -1786,7 +2248,7 @@ export default function App() {
             <div>
               <div className="flex justify-between items-center mb-16">
                 <span className="font-display text-xl tracking-[0.25em] text-[#f5f5f5]">
-                  {viewMode === 'aurelia' ? 'AURELIA' : 'PAVOI'}
+                  {viewMode === 'aurelia' ? 'JIDNY' : 'JIDNY COUTURE'}
                 </span>
                 <button
                   id="close-mobile-menu-btn"
@@ -1800,8 +2262,8 @@ export default function App() {
               <div className="flex flex-col gap-6 text-lg font-light tracking-[0.2em] text-white">
                 <button
                   onClick={() => {
-                    setActiveCategory('all');
-                    setShowCategoryOverlay(true);
+                    openShopCategory('all');
+                    setShopSortOption('rating-desc');
                     setIsMobileMenuOpen(false);
                   }}
                   className="text-left py-2 border-b border-white/5"
@@ -1810,8 +2272,8 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
-                    setActiveCategory('all');
-                    setShowCategoryOverlay(true);
+                    openShopCategory('all');
+                    setShopSortOption('alpha-asc');
                     setIsMobileMenuOpen(false);
                   }}
                   className="text-left py-2 border-b border-white/5 text-[#d4a373]"
@@ -1820,43 +2282,12 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
-                    setActiveCategory('earrings');
-                    setShowCategoryOverlay(true);
+                    openShopCategory('earrings');
                     setIsMobileMenuOpen(false);
                   }}
                   className="text-left py-2 border-b border-white/5"
                 >
                   EARRINGS
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveCategory('rings');
-                    setShowCategoryOverlay(true);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="text-left py-2 border-b border-white/5"
-                >
-                  RINGS
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveCategory('necklaces');
-                    setShowCategoryOverlay(true);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="text-left py-2 border-b border-white/5"
-                >
-                  NECKLACES
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveCategory('bracelets');
-                    setShowCategoryOverlay(true);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="text-left py-2 border-b border-white/5"
-                >
-                  BRACELETS
                 </button>
               </div>
             </div>
@@ -1883,7 +2314,7 @@ export default function App() {
                 </button>
               </div>
               <p className="text-center text-[10px] tracking-widest text-white/30">
-                AURELIA FASHION COUTURE © 2026
+                JIDNY FASHION COUTURE © 2026
               </p>
             </div>
           </motion.div>
@@ -1901,7 +2332,7 @@ export default function App() {
                 
                 {/* Brand Logo inside Details Page */}
                 <span className="font-display text-sm font-semibold tracking-[0.25em] text-neutral-900">
-                  {viewMode === 'aurelia' ? 'AURELIA' : 'PAVOI'}
+                  {viewMode === 'aurelia' ? 'JIDNY' : 'JIDNY COUTURE'}
                 </span>
 
                 {/* Close Button */}
@@ -2176,7 +2607,7 @@ export default function App() {
                         <span className="text-[9px] font-semibold text-neutral-400 tracking-widest uppercase block">
                           YELLOW GOLD
                         </span>
-                        <h4 className="text-[11px] font-bold tracking-wide text-neutral-900 mt-1 leading-tight group-hover:text-black transition-colors line-clamp-1">
+                        <h4 className="text-[11px] font-bold tracking-wide text-neutral-900 mt-1 leading-tight group-hover:text-black group-hover:underline transition-colors line-clamp-1">
                           {item.name}
                         </h4>
                         <p className="text-[11px] font-semibold text-neutral-600 mt-1">
@@ -2440,7 +2871,7 @@ export default function App() {
                             : 'bg-transparent text-white/60 border-white/5 hover:border-white/20'
                         }`}
                       >
-                        <span>Aurelia Mode</span>
+                        <span>Jidny Mode</span>
                         <span className="text-[8px] font-light tracking-wide opacity-80">(Left Aligned)</span>
                       </button>
                       <button
@@ -2451,7 +2882,7 @@ export default function App() {
                             : 'bg-transparent text-white/60 border-white/5 hover:border-white/20'
                         }`}
                       >
-                        <span>Pavoi Mode</span>
+                        <span>Couture Mode</span>
                         <span className="text-[8px] font-light tracking-wide opacity-80">(Centered Slogan)</span>
                       </button>
                     </div>
@@ -2551,7 +2982,7 @@ export default function App() {
                   RESET TO ARCHITECTURAL DEFAULTS
                 </button>
                 <p className="text-center text-[9px] text-white/30 tracking-wider">
-                  CREATED FOR INTUITIVE REVIEW • AURELIA v2.6
+                  CREATED FOR INTUITIVE REVIEW • JIDNY v2.6
                 </p>
               </div>
             </motion.div>
@@ -2584,7 +3015,7 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-white/5 pb-4 mb-6">
                   <div>
                     <span className="text-[9px] tracking-[0.25em] text-[#d4a373] font-bold uppercase">
-                      AURELIA x PAVOI BOUTIQUE
+                      JIDNY BOUTIQUE
                     </span>
                     <h2 className="text-sm font-semibold tracking-[0.15em] text-white uppercase mt-0.5">
                       {activeCategory === 'all' ? 'THE FULL CAMPAIGN COLLECTION' : `${activeCategory} COLLECTION`}
